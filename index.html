@@ -1,0 +1,3079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Party PhotoBooth</title>
+
+<!-- WebRTC -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+<!-- ZIP download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, sans-serif;
+    color: white;
+
+    background:
+        radial-gradient(circle at 10% 10%, #ff4ecd55, transparent 30%),
+        radial-gradient(circle at 90% 90%, #635bff55, transparent 30%),
+        #100d20;
+}
+
+header {
+    text-align: center;
+    padding: 25px 15px 10px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 40px;
+}
+
+header p {
+    color: #cfc9df;
+}
+
+.container {
+    width: 94%;
+    max-width: 1150px;
+    margin: auto;
+}
+
+.panel {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 22px;
+    padding: 20px;
+    margin: 18px 0;
+    backdrop-filter: blur(15px);
+}
+
+h2 {
+    margin-top: 0;
+}
+
+button,
+select,
+input {
+    font-size: 15px;
+}
+
+button {
+    border: 0;
+    border-radius: 12px;
+    padding: 13px 18px;
+    background: #ff4ecd;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: .2s;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+}
+
+button:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.green {
+    background: #12c98a;
+}
+
+.blue {
+    background: #566dff;
+}
+
+.red {
+    background: #ef476f;
+}
+
+.gray {
+    background: #45415c;
+}
+
+input,
+select {
+    border: 0;
+    border-radius: 10px;
+    padding: 13px;
+    background: white;
+    color: #222;
+}
+
+input {
+    min-width: 200px;
+    flex: 1;
+}
+
+/* MODE */
+
+.mode-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.mode-button {
+    flex: 1;
+    min-width: 200px;
+    padding: 20px;
+    background: #302b45;
+}
+
+.mode-button.selected {
+    background: linear-gradient(
+        135deg,
+        #ff4ecd,
+        #765cff
+    );
+}
+
+/* ROOM */
+
+.room-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+#roomInfo {
+    display: none;
+    margin-top: 15px;
+    padding: 15px;
+    border-radius: 12px;
+    background: rgba(0,0,0,.3);
+    word-break: break-word;
+}
+
+.status {
+    margin-top: 12px;
+    color: #9eeaff;
+}
+
+/* CAMERA */
+
+.camera-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    margin: auto;
+    overflow: hidden;
+    border-radius: 20px;
+    background: #000;
+}
+
+#localVideo {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+}
+
+.video-label {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    padding: 7px 13px;
+    border-radius: 20px;
+    background: rgba(0,0,0,.65);
+}
+
+/* FRIENDS */
+
+.remote-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.remote-box {
+    position: relative;
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.remote-video {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+}
+
+.remote-label {
+    position: absolute;
+    bottom: 7px;
+    left: 7px;
+    background: rgba(0,0,0,.65);
+    padding: 5px 9px;
+    border-radius: 15px;
+    font-size: 12px;
+}
+
+/* FILTERS */
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter {
+    background: #37324d;
+}
+
+.filter.active {
+    background: #ff4ecd;
+}
+
+/* SETTINGS */
+
+.settings {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+}
+
+.setting {
+    background: rgba(0,0,0,.2);
+    padding: 15px;
+    border-radius: 15px;
+}
+
+.setting label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.setting select {
+    width: 100%;
+}
+
+/* CONTROLS */
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* PROGRESS */
+
+.progress {
+    height: 12px;
+    background: #302b45;
+    border-radius: 20px;
+    overflow: hidden;
+    margin-top: 15px;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(
+        90deg,
+        #ff4ecd,
+        #695bff
+    );
+    transition: width .3s;
+}
+
+/* COUNTDOWN */
+
+#countdownOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,.65);
+}
+
+#countdownNumber {
+    font-size: 150px;
+    font-weight: bold;
+    text-shadow:
+        0 0 30px #ff4ecd,
+        0 0 70px #765cff;
+
+    animation: countdownPop .8s;
+}
+
+@keyframes countdownPop {
+    0% {
+        transform: scale(.2);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* STRIPS */
+
+#stripGallery {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(190px, 1fr));
+    gap: 20px;
+}
+
+.strip-card {
+    padding: 12px;
+    border-radius: 15px;
+    background: rgba(0,0,0,.25);
+    text-align: center;
+}
+
+.strip-card img {
+    width: 100%;
+    display: block;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+canvas {
+    display: none;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@media(max-width:600px) {
+    header h1 {
+        font-size: 30px;
+    }
+
+    #countdownNumber {
+        font-size: 100px;
+    }
+
+    button {
+        width: 100%;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>📸 Party PhotoBooth</h1>
+    <p>Create memories alone or with your friends</p>
+</header>
+
+<div class="container">
+
+<!-- =====================================================
+     MODE
+===================================================== -->
+
+<div class="panel">
+
+    <h2>✨ Choose Your Mode</h2>
+
+    <div class="mode-buttons">
+
+        <button
+            id="aloneMode"
+            class="mode-button selected"
+            onclick="chooseMode('alone')">
+
+            👤<br>
+            <strong>TAKE ALONE</strong>
+
+            <br><br>
+
+            Take photos by yourself
+
+        </button>
+
+        <button
+            id="friendsMode"
+            class="mode-button"
+            onclick="chooseMode('friends')">
+
+            👥<br>
+            <strong>JOIN FRIENDS</strong>
+
+            <br><br>
+
+            Take photos together
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     FRIEND ROOM
+===================================================== -->
+
+<div
+    id="friendsPanel"
+    class="panel hidden">
+
+    <h2>👥 Friends Room</h2>
+
+    <div class="room-controls">
+
+        <button
+            class="green"
+            onclick="createRoom()">
+
+            ✨ Create Room
+
+        </button>
+
+        <input
+            id="roomCode"
+            placeholder="Enter friend's Room ID">
+
+        <button
+            class="blue"
+            onclick="joinRoom()">
+
+            Join Room
+
+        </button>
+
+    </div>
+
+    <div id="roomInfo"></div>
+
+</div>
+
+
+<!-- =====================================================
+     CAMERA
+===================================================== -->
+
+<div class="panel">
+
+    <h2>🎥 Camera</h2>
+
+    <div class="camera-wrapper">
+
+        <video
+            id="localVideo"
+            autoplay
+            muted
+            playsinline>
+        </video>
+
+        <div class="video-label">
+            You
+        </div>
+
+    </div>
+
+    <div
+        id="remoteGrid"
+        class="remote-grid">
+    </div>
+
+    <div
+        id="participantText"
+        style="margin-top:12px">
+
+        Participants: 1
+
+    </div>
+
+    <div
+        id="status"
+        class="status">
+
+        Starting camera...
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     FILTERS
+===================================================== -->
+
+<div class="panel">
+
+    <h2>🎨 Choose Filter</h2>
+
+    <div class="filters">
+
+        <button
+            class="filter active"
+            data-filter="none"
+            onclick="setFilter(this)">
+            Normal
+        </button>
+
+        <button
+            class="filter"
+            data-filter="grayscale(1)"
+            onclick="setFilter(this)">
+            B&W
+        </button>
+
+        <button
+            class="filter"
+            data-filter="sepia(1)"
+            onclick="setFilter(this)">
+            Sepia
+        </button>
+
+        <button
+            class="filter"
+            data-filter="contrast(1.4)"
+            onclick="setFilter(this)">
+            Contrast
+        </button>
+
+        <button
+            class="filter"
+            data-filter="brightness(1.3)"
+            onclick="setFilter(this)">
+            Bright
+        </button>
+
+        <button
+            class="filter"
+            data-filter="saturate(2)"
+            onclick="setFilter(this)">
+            Vivid
+        </button>
+
+        <button
+            class="filter"
+            data-filter="hue-rotate(90deg)"
+            onclick="setFilter(this)">
+            Color
+        </button>
+
+        <button
+            class="filter"
+            data-filter="blur(1.5px)"
+            onclick="setFilter(this)">
+            Soft
+        </button>
+
+        <button
+            class="filter"
+            data-filter="invert(1)"
+            onclick="setFilter(this)">
+            Invert
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     STRIP SETTINGS
+===================================================== -->
+
+<div class="panel">
+
+    <h2>🎞️ Photo Strip Settings</h2>
+
+    <div class="settings">
+
+        <div class="setting">
+
+            <label>
+                📷 Photos in each strip
+            </label>
+
+            <select id="photosPerStrip">
+
+                <option value="1">
+                    1 Photo
+                </option>
+
+                <option value="2">
+                    2 Photos
+                </option>
+
+                <option value="3" selected>
+                    3 Photos
+                </option>
+
+                <option value="4">
+                    4 Photos
+                </option>
+
+                <option value="5">
+                    5 Photos
+                </option>
+
+                <option value="6">
+                    6 Photos
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="setting">
+
+            <label>
+                🎞️ Number of strips
+            </label>
+
+            <select id="stripCount">
+
+                <option value="1">
+                    1 Strip
+                </option>
+
+                <option value="2">
+                    2 Strips
+                </option>
+
+                <option value="3" selected>
+                    3 Strips
+                </option>
+
+                <option value="4">
+                    4 Strips
+                </option>
+
+                <option value="5">
+                    5 Strips
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="setting">
+
+            <label>
+                ⏱️ Countdown
+            </label>
+
+            <select id="countdownTime">
+
+                <option value="3">
+                    3 seconds
+                </option>
+
+                <option value="5" selected>
+                    5 seconds
+                </option>
+
+                <option value="10">
+                    10 seconds
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div style="margin-top:15px">
+
+        <strong id="totalPhotos">
+            Total photos: 9
+        </strong>
+
+    </div>
+
+    <div class="progress">
+
+        <div
+            id="progressBar"
+            class="progress-bar">
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     CONTROLS
+===================================================== -->
+
+<div class="panel">
+
+    <div class="controls">
+
+        <button
+            class="gray"
+            onclick="switchCamera()">
+
+            🔄 Switch Camera
+
+        </button>
+
+        <button
+            class="red"
+            id="startButton"
+            onclick="startPhotoSession()">
+
+            📸 START PHOTO SESSION
+
+        </button>
+
+        <button
+            class="green"
+            onclick="downloadAllStrips()">
+
+            📦 Download All
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     RESULTS
+===================================================== -->
+
+<div class="panel">
+
+    <h2>🖼️ Photo Strips</h2>
+
+    <p id="resultText">
+        Your photo strips will appear here.
+    </p>
+
+    <div id="stripGallery"></div>
+
+</div>
+
+</div>
+
+
+<!-- COUNTDOWN -->
+
+<div id="countdownOverlay">
+
+    <div id="countdownNumber">
+        3
+    </div>
+
+</div>
+
+
+<canvas id="captureCanvas"></canvas>
+
+
+<script>
+
+/* =====================================================
+   GLOBAL VARIABLES
+===================================================== */
+
+let peer = null;
+
+let localStream = null;
+
+let currentMode = "alone";
+
+let currentFilter = "none";
+
+let facingMode = "user";
+
+let isHost = false;
+
+let sessionRunning = false;
+
+let calls = {};
+
+let dataConnections = {};
+
+let remoteVideos = {};
+
+let knownPeers = new Set();
+
+let capturedPhotos = [];
+
+let generatedStrips = [];
+
+
+
+/* =====================================================
+   CAMERA
+===================================================== */
+
+async function startCamera() {
+
+    try {
+
+        if (localStream) {
+
+            localStream
+                .getTracks()
+                .forEach(
+                    track => track.stop()
+                );
+
+        }
+
+        localStream =
+            await navigator
+                .mediaDevices
+                .getUserMedia({
+
+                    video: {
+                        facingMode:
+                            facingMode,
+
+                        width: {
+                            ideal: 1280
+                        },
+
+                        height: {
+                            ideal: 720
+                        }
+                    },
+
+                    audio: true
+
+                });
+
+        document
+            .getElementById("localVideo")
+            .srcObject =
+            localStream;
+
+        applyFilter();
+
+        setStatus(
+            "Camera ready ✅"
+        );
+
+    }
+
+    catch(error) {
+
+        console.error(error);
+
+        setStatus(
+            "Camera permission is required."
+        );
+
+        alert(
+            "Please allow camera and microphone access."
+        );
+
+    }
+
+}
+
+
+
+/* =====================================================
+   MODE
+===================================================== */
+
+function chooseMode(mode) {
+
+    currentMode =
+        mode;
+
+    document
+        .getElementById("aloneMode")
+        .classList.toggle(
+            "selected",
+            mode === "alone"
+        );
+
+    document
+        .getElementById("friendsMode")
+        .classList.toggle(
+            "selected",
+            mode === "friends"
+        );
+
+    document
+        .getElementById("friendsPanel")
+        .classList.toggle(
+            "hidden",
+            mode !== "friends"
+        );
+
+    if(mode === "alone") {
+
+        setStatus(
+            "Solo mode — you're taking photos alone 👤"
+        );
+
+    }
+
+    else {
+
+        setStatus(
+            "Friends mode — create or join a room 👥"
+        );
+
+    }
+
+}
+
+
+
+/* =====================================================
+   CREATE ROOM
+===================================================== */
+
+function createRoom() {
+
+    if(!localStream) {
+
+        alert(
+            "Wait for your camera."
+        );
+
+        return;
+
+    }
+
+    isHost = true;
+
+    peer =
+        new Peer();
+
+    peer.on(
+        "open",
+        id => {
+
+            knownPeers.add(id);
+
+            const info =
+                document.getElementById(
+                    "roomInfo"
+                );
+
+            info.style.display =
+                "block";
+
+            info.innerHTML = `
+
+                <strong>🎉 Your Room ID</strong>
+
+                <div style="
+                    font-size:28px;
+                    color:#ff72d8;
+                    margin:10px 0;
+                ">
+                    ${id}
+                </div>
+
+                Send this ID to your friends.
+
+                <br><br>
+
+                Friends can enter this ID
+                on their device and press
+                <b>Join Room</b>.
+
+            `;
+
+            setStatus(
+                "Room created. Waiting for friends..."
+            );
+
+        }
+    );
+
+
+    /*
+       Receive video calls.
+    */
+
+    peer.on(
+        "call",
+        call => {
+
+            knownPeers.add(
+                call.peer
+            );
+
+            calls[
+                call.peer
+            ] = call;
+
+            call.answer(
+                localStream
+            );
+
+            call.on(
+                "stream",
+                stream => {
+
+                    addRemoteVideo(
+                        call.peer,
+                        stream
+                    );
+
+                }
+            );
+
+            call.on(
+                "close",
+                () => {
+
+                    removeRemoteVideo(
+                        call.peer
+                    );
+
+                }
+            );
+
+            broadcastPeerList();
+
+        }
+    );
+
+
+    /*
+       Receive data connections.
+    */
+
+    peer.on(
+        "connection",
+        connection => {
+
+            setupDataConnection(
+                connection
+            );
+
+        }
+    );
+
+
+    peer.on(
+        "error",
+        error => {
+
+            console.error(error);
+
+            setStatus(
+                "Room error: " +
+                error.type
+            );
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   JOIN ROOM
+===================================================== */
+
+function joinRoom() {
+
+    const room =
+        document
+            .getElementById(
+                "roomCode"
+            )
+            .value
+            .trim();
+
+    if(!room) {
+
+        alert(
+            "Enter a Room ID."
+        );
+
+        return;
+
+    }
+
+    if(!localStream) {
+
+        alert(
+            "Wait for your camera."
+        );
+
+        return;
+
+    }
+
+    isHost = false;
+
+    peer =
+        new Peer();
+
+    peer.on(
+        "open",
+        myID => {
+
+            knownPeers.add(myID);
+
+            /*
+               Connect to host for data.
+            */
+
+            const data =
+                peer.connect(
+                    room
+                );
+
+            setupDataConnection(
+                data
+            );
+
+
+            /*
+               Call host with our camera.
+            */
+
+            callPeer(
+                room
+            );
+
+
+            setStatus(
+                "Connecting to room..."
+            );
+
+            document
+                .getElementById(
+                    "roomInfo"
+                )
+                .style.display =
+                "block";
+
+            document
+                .getElementById(
+                    "roomInfo"
+                )
+                .innerHTML =
+
+                "✅ Connecting to room: " +
+                "<strong>" +
+                room +
+                "</strong>";
+
+        }
+    );
+
+
+    /*
+       Receive calls from host
+       or other friends.
+    */
+
+    peer.on(
+        "call",
+        call => {
+
+            knownPeers.add(
+                call.peer
+            );
+
+            calls[
+                call.peer
+            ] = call;
+
+            call.answer(
+                localStream
+            );
+
+            call.on(
+                "stream",
+                stream => {
+
+                    addRemoteVideo(
+                        call.peer,
+                        stream
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    /*
+       Receive data connections.
+    */
+
+    peer.on(
+        "connection",
+        connection => {
+
+            setupDataConnection(
+                connection
+            );
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   CALL ANOTHER PEER
+===================================================== */
+
+function callPeer(
+    peerID
+) {
+
+    if(!peer) return;
+
+    if(
+        peerID === peer.id
+    ) return;
+
+    if(
+        calls[peerID]
+    ) return;
+
+    const call =
+        peer.call(
+            peerID,
+            localStream
+        );
+
+    if(!call) return;
+
+    calls[
+        peerID
+    ] = call;
+
+    call.on(
+        "stream",
+        stream => {
+
+            addRemoteVideo(
+                peerID,
+                stream
+            );
+
+        }
+    );
+
+    call.on(
+        "close",
+        () => {
+
+            removeRemoteVideo(
+                peerID
+            );
+
+            delete calls[
+                peerID
+            ];
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   DATA CONNECTION
+===================================================== */
+
+function setupDataConnection(
+    connection
+) {
+
+    dataConnections[
+        connection.peer
+    ] =
+        connection;
+
+
+    connection.on(
+        "open",
+        () => {
+
+            /*
+               Tell the new person
+               who is already here.
+            */
+
+            connection.send({
+
+                type:
+                    "peer-list",
+
+                peers:
+                    Array.from(
+                        knownPeers
+                    )
+
+            });
+
+
+            /*
+               Add this person.
+            */
+
+            knownPeers.add(
+                connection.peer
+            );
+
+
+            broadcastPeerList();
+
+        }
+    );
+
+
+    connection.on(
+        "data",
+        message => {
+
+            if(
+                !message ||
+                !message.type
+            ) return;
+
+
+            if(
+                message.type ===
+                "peer-list"
+            ) {
+
+                const peers =
+                    message.peers ||
+                    [];
+
+
+                peers.forEach(
+                    id => {
+
+                        if(
+                            id !==
+                            peer.id
+                        ) {
+
+                            knownPeers.add(
+                                id
+                            );
+
+                        }
+
+                    }
+                );
+
+
+                /*
+                   Connect to everyone.
+                */
+
+                knownPeers.forEach(
+                    id => {
+
+                        if(
+                            id !==
+                            peer.id
+                        ) {
+
+                            if(
+                                !calls[id]
+                            ) {
+
+                                callPeer(
+                                    id
+                                );
+
+                            }
+
+
+                            if(
+                                !dataConnections[id]
+                            ) {
+
+                                try {
+
+                                    const dc =
+                                        peer.connect(
+                                            id
+                                        );
+
+                                    setupDataConnection(
+                                        dc
+                                    );
+
+                                }
+
+                                catch(e) {}
+
+                            }
+
+                        }
+
+                    }
+                );
+
+            }
+
+        }
+    );
+
+
+    connection.on(
+        "close",
+        () => {
+
+            delete dataConnections[
+                connection.peer
+            ];
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   BROADCAST PEER LIST
+===================================================== */
+
+function broadcastPeerList() {
+
+    const message = {
+
+        type:
+            "peer-list",
+
+        peers:
+            Array.from(
+                knownPeers
+            )
+
+    };
+
+
+    Object.values(
+        dataConnections
+    ).forEach(
+        connection => {
+
+            try {
+
+                if(
+                    connection.open
+                ) {
+
+                    connection.send(
+                        message
+                    );
+
+                }
+
+            }
+
+            catch(e) {}
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   REMOTE VIDEO
+===================================================== */
+
+function addRemoteVideo(
+    peerID,
+    stream
+) {
+
+    if(
+        remoteVideos[peerID]
+    ) {
+
+        remoteVideos[
+            peerID
+        ].video.srcObject =
+            stream;
+
+        return;
+
+    }
+
+
+    const box =
+        document.createElement(
+            "div"
+        );
+
+    box.className =
+        "remote-box";
+
+
+    const video =
+        document.createElement(
+            "video"
+        );
+
+    video.className =
+        "remote-video";
+
+    video.autoplay =
+        true;
+
+    video.playsInline =
+        true;
+
+    video.srcObject =
+        stream;
+
+    video.style.filter =
+        currentFilter;
+
+
+    const label =
+        document.createElement(
+            "div"
+        );
+
+    label.className =
+        "remote-label";
+
+    label.innerText =
+        "Friend";
+
+
+    box.appendChild(
+        video
+    );
+
+    box.appendChild(
+        label
+    );
+
+
+    document
+        .getElementById(
+            "remoteGrid"
+        )
+        .appendChild(
+            box
+        );
+
+
+    remoteVideos[
+        peerID
+    ] = {
+
+        box:
+            box,
+
+        video:
+            video
+
+    };
+
+
+    updateParticipantCount();
+
+}
+
+
+
+/* =====================================================
+   REMOVE REMOTE
+===================================================== */
+
+function removeRemoteVideo(
+    peerID
+) {
+
+    if(
+        remoteVideos[peerID]
+    ) {
+
+        remoteVideos[
+            peerID
+        ].box.remove();
+
+        delete remoteVideos[
+            peerID
+        ];
+
+    }
+
+
+    updateParticipantCount();
+
+}
+
+
+
+/* =====================================================
+   PARTICIPANT COUNT
+===================================================== */
+
+function updateParticipantCount() {
+
+    const count =
+        1 +
+        Object.keys(
+            remoteVideos
+        ).length;
+
+
+    document
+        .getElementById(
+            "participantText"
+        )
+        .innerText =
+        "Participants: " +
+        count;
+
+}
+
+
+
+/* =====================================================
+   FILTER
+===================================================== */
+
+function setFilter(
+    button
+) {
+
+    currentFilter =
+        button.dataset.filter;
+
+
+    document
+        .querySelectorAll(
+            ".filter"
+        )
+        .forEach(
+            item => {
+
+                item.classList.remove(
+                    "active"
+                );
+
+            }
+        );
+
+
+    button.classList.add(
+        "active"
+    );
+
+
+    applyFilter();
+
+
+    Object.values(
+        remoteVideos
+    ).forEach(
+        item => {
+
+            item.video.style.filter =
+                currentFilter;
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   APPLY LOCAL FILTER
+===================================================== */
+
+function applyFilter() {
+
+    document
+        .getElementById(
+            "localVideo"
+        )
+        .style.filter =
+        currentFilter;
+
+}
+
+
+
+/* =====================================================
+   SWITCH CAMERA
+===================================================== */
+
+async function switchCamera() {
+
+    facingMode =
+        facingMode === "user"
+            ? "environment"
+            : "user";
+
+
+    await startCamera();
+
+
+    /*
+       Replace camera track
+       in existing calls.
+    */
+
+    Object.values(
+        calls
+    ).forEach(
+        call => {
+
+            try {
+
+                const sender =
+                    call.peerConnection
+                        ?.getSenders()
+                        .find(
+                            s =>
+                                s.track &&
+                                s.track.kind ===
+                                "video"
+                        );
+
+
+                if(sender) {
+
+                    sender.replaceTrack(
+                        localStream
+                            .getVideoTracks()[0]
+                    );
+
+                }
+
+            }
+
+            catch(error) {
+
+                console.log(error);
+
+            }
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   SETTINGS
+===================================================== */
+
+function updateTotalPhotos() {
+
+    const photos =
+        Number(
+            document
+                .getElementById(
+                    "photosPerStrip"
+                )
+                .value
+        );
+
+    const strips =
+        Number(
+            document
+                .getElementById(
+                    "stripCount"
+                )
+                .value
+        );
+
+
+    document
+        .getElementById(
+            "totalPhotos"
+        )
+        .innerText =
+        "Total photos: " +
+        (
+            photos *
+            strips
+        );
+
+}
+
+
+document
+    .getElementById(
+        "photosPerStrip"
+    )
+    .addEventListener(
+        "change",
+        updateTotalPhotos
+    );
+
+
+document
+    .getElementById(
+        "stripCount"
+    )
+    .addEventListener(
+        "change",
+        updateTotalPhotos
+    );
+
+
+updateTotalPhotos();
+
+
+
+/* =====================================================
+   PHOTO SESSION
+===================================================== */
+
+async function startPhotoSession() {
+
+    if(sessionRunning)
+        return;
+
+
+    if(
+        currentMode ===
+        "friends" &&
+        !isHost
+    ) {
+
+        alert(
+            "The room creator starts the photo session."
+        );
+
+        return;
+
+    }
+
+
+    if(!localStream) {
+
+        alert(
+            "Camera is not ready."
+        );
+
+        return;
+
+    }
+
+
+    const photosPerStrip =
+        Number(
+            document
+                .getElementById(
+                    "photosPerStrip"
+                )
+                .value
+        );
+
+
+    const stripCount =
+        Number(
+            document
+                .getElementById(
+                    "stripCount"
+                )
+                .value
+        );
+
+
+    const countdown =
+        Number(
+            document
+                .getElementById(
+                    "countdownTime"
+                )
+                .value
+        );
+
+
+    const totalPhotos =
+        photosPerStrip *
+        stripCount;
+
+
+    sessionRunning =
+        true;
+
+
+    document
+        .getElementById(
+            "startButton"
+        )
+        .disabled =
+        true;
+
+
+    capturedPhotos =
+        [];
+
+    generatedStrips =
+        [];
+
+
+    document
+        .getElementById(
+            "stripGallery"
+        )
+        .innerHTML =
+        "";
+
+
+    document
+        .getElementById(
+            "progressBar"
+        )
+        .style.width =
+        "0%";
+
+
+    for(
+        let i = 0;
+        i < totalPhotos;
+        i++
+    ) {
+
+        setStatus(
+            "Get ready for photo " +
+            (i + 1) +
+            " of " +
+            totalPhotos
+        );
+
+
+        await countdownAnimation(
+            countdown
+        );
+
+
+        const photo =
+            captureGroup();
+
+
+        capturedPhotos.push(
+            photo
+        );
+
+
+        const percent =
+            (
+                (i + 1) /
+                totalPhotos
+            ) * 100;
+
+
+        document
+            .getElementById(
+                "progressBar"
+            )
+            .style.width =
+            percent + "%";
+
+
+        await sleep(
+            1000
+        );
+
+    }
+
+
+    setStatus(
+        "Creating photo strips..."
+    );
+
+
+    for(
+        let i = 0;
+        i < stripCount;
+        i++
+    ) {
+
+        const photos =
+            capturedPhotos.slice(
+                i * photosPerStrip,
+                (i + 1) *
+                photosPerStrip
+            );
+
+
+        generatedStrips.push(
+            createStrip(
+                photos
+            )
+        );
+
+    }
+
+
+    generatedStrips =
+        await Promise.all(
+            generatedStrips
+        );
+
+
+    displayStrips();
+
+
+    setStatus(
+        "🎉 Finished! Your strips are ready."
+    );
+
+
+    document
+        .getElementById(
+            "startButton"
+        )
+        .disabled =
+        false;
+
+
+    sessionRunning =
+        false;
+
+}
+
+
+
+/* =====================================================
+   COUNTDOWN
+===================================================== */
+
+function countdownAnimation(
+    seconds
+) {
+
+    return new Promise(
+        resolve => {
+
+            const overlay =
+                document
+                    .getElementById(
+                        "countdownOverlay"
+                    );
+
+
+            const number =
+                document
+                    .getElementById(
+                        "countdownNumber"
+                    );
+
+
+            overlay.style.display =
+                "flex";
+
+
+            let remaining =
+                seconds;
+
+
+            number.innerText =
+                remaining;
+
+
+            let timer =
+                setInterval(
+                    () => {
+
+                        remaining--;
+
+
+                        if(
+                            remaining <= 0
+                        ) {
+
+                            clearInterval(
+                                timer
+                            );
+
+
+                            number.innerText =
+                                "📸";
+
+
+                            setTimeout(
+                                () => {
+
+                                    overlay.style.display =
+                                        "none";
+
+                                    resolve();
+
+                                },
+                                500
+                            );
+
+                        }
+
+                        else {
+
+                            number.innerText =
+                                remaining;
+
+
+                            number.style.animation =
+                                "none";
+
+                            void number.offsetWidth;
+
+                            number.style.animation =
+                                "countdownPop .8s";
+
+                        }
+
+                    },
+                    1000
+                );
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   CAPTURE GROUP / SOLO
+===================================================== */
+
+function captureGroup() {
+
+    const canvas =
+        document
+            .getElementById(
+                "captureCanvas"
+            );
+
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    const videos = [
+
+        document
+            .getElementById(
+                "localVideo"
+            ),
+
+        ...Object.values(
+            remoteVideos
+        ).map(
+            item =>
+                item.video
+        )
+
+    ];
+
+
+    const width =
+        1280;
+
+    const height =
+        720;
+
+
+    canvas.width =
+        width;
+
+    canvas.height =
+        height;
+
+
+    /*
+       Background
+    */
+
+    ctx.fillStyle =
+        "#111";
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    /*
+       SOLO MODE
+       gets the entire image.
+    */
+
+    if(
+        currentMode ===
+        "alone"
+    ) {
+
+        drawVideoCover(
+            ctx,
+            videos[0],
+            0,
+            0,
+            width,
+            height
+        );
+
+    }
+
+    else {
+
+        /*
+           FRIEND MODE
+        */
+
+        let columns;
+
+        if(
+            videos.length === 1
+        ) {
+
+            columns = 1;
+
+        }
+
+        else if(
+            videos.length <= 4
+        ) {
+
+            columns = 2;
+
+        }
+
+        else {
+
+            columns = 3;
+
+        }
+
+
+        const rows =
+            Math.ceil(
+                videos.length /
+                columns
+            );
+
+
+        const tileWidth =
+            width /
+            columns;
+
+
+        const tileHeight =
+            height /
+            rows;
+
+
+        videos.forEach(
+            (video, index) => {
+
+                const x =
+                    (
+                        index %
+                        columns
+                    ) *
+                    tileWidth;
+
+
+                const y =
+                    Math.floor(
+                        index /
+                        columns
+                    ) *
+                    tileHeight;
+
+
+                drawVideoCover(
+                    ctx,
+                    video,
+                    x,
+                    y,
+                    tileWidth,
+                    tileHeight
+                );
+
+            }
+        );
+
+    }
+
+
+    /*
+       White border.
+    */
+
+    ctx.strokeStyle =
+        "white";
+
+    ctx.lineWidth =
+        12;
+
+    ctx.strokeRect(
+        6,
+        6,
+        width - 12,
+        height - 12
+    );
+
+
+    return canvas.toDataURL(
+        "image/jpeg",
+        .95
+    );
+
+}
+
+
+
+/* =====================================================
+   DRAW VIDEO
+===================================================== */
+
+function drawVideoCover(
+    ctx,
+    video,
+    x,
+    y,
+    width,
+    height
+) {
+
+    if(
+        !video ||
+        !video.videoWidth
+    )
+        return;
+
+
+    const videoRatio =
+        video.videoWidth /
+        video.videoHeight;
+
+
+    const boxRatio =
+        width /
+        height;
+
+
+    let drawWidth;
+
+    let drawHeight;
+
+
+    if(
+        videoRatio >
+        boxRatio
+    ) {
+
+        drawHeight =
+            height;
+
+        drawWidth =
+            height *
+            videoRatio;
+
+    }
+
+    else {
+
+        drawWidth =
+            width;
+
+        drawHeight =
+            width /
+            videoRatio;
+
+    }
+
+
+    const drawX =
+        x +
+        (
+            width -
+            drawWidth
+        ) / 2;
+
+
+    const drawY =
+        y +
+        (
+            height -
+            drawHeight
+        ) / 2;
+
+
+    ctx.save();
+
+
+    ctx.filter =
+        currentFilter;
+
+
+    ctx.beginPath();
+
+    ctx.rect(
+        x,
+        y,
+        width,
+        height
+    );
+
+    ctx.clip();
+
+
+    ctx.drawImage(
+        video,
+        drawX,
+        drawY,
+        drawWidth,
+        drawHeight
+    );
+
+
+    ctx.restore();
+
+}
+
+
+
+/* =====================================================
+   CREATE STRIP
+===================================================== */
+
+function createStrip(
+    photoData
+) {
+
+    return new Promise(
+        resolve => {
+
+            const width =
+                600;
+
+            const photoHeight =
+                430;
+
+            const gap =
+                20;
+
+            const top =
+                80;
+
+            const bottom =
+                100;
+
+
+            const height =
+                top +
+                photoData.length *
+                photoHeight +
+                (
+                    photoData.length - 1
+                ) *
+                gap +
+                bottom;
+
+
+            const canvas =
+                document
+                    .createElement(
+                        "canvas"
+                    );
+
+
+            canvas.width =
+                width;
+
+            canvas.height =
+                height;
+
+
+            const ctx =
+                canvas.getContext(
+                    "2d"
+                );
+
+
+            /*
+               Background
+            */
+
+            const gradient =
+                ctx.createLinearGradient(
+                    0,
+                    0,
+                    width,
+                    height
+                );
+
+
+            gradient.addColorStop(
+                0,
+                "#ff4ecd"
+            );
+
+
+            gradient.addColorStop(
+                1,
+                "#6256ff"
+            );
+
+
+            ctx.fillStyle =
+                gradient;
+
+
+            ctx.fillRect(
+                0,
+                0,
+                width,
+                height
+            );
+
+
+            /*
+               Header
+            */
+
+            ctx.fillStyle =
+                "white";
+
+            ctx.font =
+                "bold 36px Arial";
+
+            ctx.textAlign =
+                "center";
+
+            ctx.fillText(
+                "PHOTOBOOTH",
+                width / 2,
+                50
+            );
+
+
+            let loaded =
+                0;
+
+
+            photoData.forEach(
+                (data, index) => {
+
+                    const image =
+                        new Image();
+
+
+                    image.onload =
+                        () => {
+
+                            const y =
+                                top +
+                                index *
+                                (
+                                    photoHeight +
+                                    gap
+                                );
+
+
+                            drawImageCover(
+                                ctx,
+                                image,
+                                0,
+                                y,
+                                width,
+                                photoHeight
+                            );
+
+
+                            ctx.strokeStyle =
+                                "white";
+
+                            ctx.lineWidth =
+                                8;
+
+                            ctx.strokeRect(
+                                4,
+                                y + 4,
+                                width - 8,
+                                photoHeight - 8
+                            );
+
+
+                            loaded++;
+
+
+                            if(
+                                loaded ===
+                                photoData.length
+                            ) {
+
+                                /*
+                                   Footer
+                                */
+
+                                ctx.fillStyle =
+                                    "white";
+
+                                ctx.font =
+                                    "bold 28px Arial";
+
+                                ctx.textAlign =
+                                    "center";
+
+                                ctx.fillText(
+                                    "✨ MEMORIES ✨",
+                                    width / 2,
+                                    height - 45
+                                );
+
+
+                                resolve(
+                                    canvas.toDataURL(
+                                        "image/png"
+                                    )
+                                );
+
+                            }
+
+                        };
+
+
+                    image.src =
+                        data;
+
+                }
+            );
+
+        }
+    );
+
+}
+
+
+
+/* =====================================================
+   DRAW IMAGE COVER
+===================================================== */
+
+function drawImageCover(
+    ctx,
+    image,
+    x,
+    y,
+    width,
+    height
+) {
+
+    const imageRatio =
+        image.width /
+        image.height;
+
+
+    const boxRatio =
+        width /
+        height;
+
+
+    let drawWidth;
+
+    let drawHeight;
+
+
+    if(
+        imageRatio >
+        boxRatio
+    ) {
+
+        drawHeight =
+            height;
+
+        drawWidth =
+            height *
+            imageRatio;
+
+    }
+
+    else {
+
+        drawWidth =
+            width;
+
+        drawHeight =
+            width /
+            imageRatio;
+
+    }
+
+
+    const drawX =
+        x +
+        (
+            width -
+            drawWidth
+        ) / 2;
+
+
+    const drawY =
+        y +
+        (
+            height -
+            drawHeight
+        ) / 2;
+
+
+    ctx.save();
+
+
+    ctx.beginPath();
+
+    ctx.rect(
+        x,
+        y,
+        width,
+        height
+    );
+
+    ctx.clip();
+
+
+    ctx.drawImage(
+        image,
+        drawX,
+        drawY,
+        drawWidth,
+        drawHeight
+    );
+
+
+    ctx.restore();
+
+}
+
+
+
+/* =====================================================
+   DISPLAY STRIPS
+===================================================== */
+
+function displayStrips() {
+
+    const gallery =
+        document
+            .getElementById(
+                "stripGallery"
+            );
+
+
+    gallery.innerHTML =
+        "";
+
+
+    generatedStrips.forEach(
+        (strip, index) => {
+
+            const card =
+                document
+                    .createElement(
+                        "div"
+                    );
+
+
+            card.className =
+                "strip-card";
+
+
+            const image =
+                document
+                    .createElement(
+                        "img"
+                    );
+
+
+            image.src =
+                strip;
+
+
+            const button =
+                document
+                    .createElement(
+                        "button"
+                    );
+
+
+            button.className =
+                "green";
+
+
+            button.innerText =
+                "💾 Download Strip " +
+                (index + 1);
+
+
+            button.onclick =
+                () => {
+
+                    downloadData(
+                        strip,
+                        "photobooth-strip-" +
+                        (index + 1) +
+                        ".png"
+                    );
+
+                };
+
+
+            card.appendChild(
+                image
+            );
+
+
+            card.appendChild(
+                button
+            );
+
+
+            gallery.appendChild(
+                card
+            );
+
+        }
+    );
+
+
+    document
+        .getElementById(
+            "resultText"
+        )
+        .innerText =
+        generatedStrips.length +
+        " strip(s) created! 🎉";
+
+}
+
+
+
+/* =====================================================
+   DOWNLOAD
+===================================================== */
+
+function downloadData(
+    data,
+    filename
+) {
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+
+    link.href =
+        data;
+
+    link.download =
+        filename;
+
+
+    document
+        .body
+        .appendChild(
+            link
+        );
+
+
+    link.click();
+
+
+    link.remove();
+
+}
+
+
+
+/* =====================================================
+   DOWNLOAD ALL
+===================================================== */
+
+async function downloadAllStrips() {
+
+    if(
+        generatedStrips.length === 0
+    ) {
+
+        alert(
+            "Take some photos first."
+        );
+
+        return;
+
+    }
+
+
+    const zip =
+        new JSZip();
+
+
+    generatedStrips.forEach(
+        (strip, index) => {
+
+            const base64 =
+                strip.split(",")[1];
+
+
+            zip.file(
+                "photobooth-strip-" +
+                (index + 1) +
+                ".png",
+
+                base64,
+
+                {
+                    base64: true
+                }
+            );
+
+        }
+    );
+
+
+    setStatus(
+        "Creating ZIP file..."
+    );
+
+
+    const blob =
+        await zip.generateAsync({
+            type: "blob"
+        });
+
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+
+    link.href =
+        url;
+
+    link.download =
+        "photobooth-strips.zip";
+
+
+    link.click();
+
+
+    URL.revokeObjectURL(
+        url
+    );
+
+
+    setStatus(
+        "All strips downloaded 📦"
+    );
+
+}
+
+
+
+/* =====================================================
+   UTILITY
+===================================================== */
+
+function sleep(
+    milliseconds
+) {
+
+    return new Promise(
+        resolve =>
+            setTimeout(
+                resolve,
+                milliseconds
+            )
+    );
+
+}
+
+
+function setStatus(
+    text
+) {
+
+    document
+        .getElementById(
+            "status"
+        )
+        .innerText =
+        text;
+
+}
+
+
+
+/* =====================================================
+   START
+===================================================== */
+
+window.addEventListener(
+    "load",
+    () => {
+
+        startCamera();
+
+    }
+);
+
+</script>
+
+</body>
+</html>
